@@ -7,49 +7,48 @@ use amethyst::utils::removal::*;
 use amethyst::input::*;
 use amethyst::renderer::VirtualKeyCode;
 use state::*;
-use hoppinworldruntime::{AllEvents, CustomStateEvent, CustomTrans, RemovalId};
+use hoppinworldruntime::{AllEvents, CustomStateEvent, RemovalId};
 
 #[derive(Default)]
 pub struct GameplayState;
 
-impl<'a, 'b> State<GameData<'a, 'b>, AllEvents> for GameplayState {
+impl dynamic::State<MyState, AllEvents> for GameplayState {
     fn on_start(&mut self, data: StateData<GameData>) {
         data.world.write_resource::<HideCursor>().hide = true;
         data.world.write_resource::<Time>().set_time_scale(1.0);
     }
 
-    fn update(&mut self, data: StateData<GameData>) -> CustomTrans<'a, 'b> {
+    fn update(&mut self, world: &mut World) -> Trans<MyState> {
         //info!("FPS: {}", data.world.read_resource::<FPSCounter>().sampled_fps());
         //info!("Delta: {}", data.world.read_resource::<Time>().delta_seconds());
         //(&data.world.read_storage::<Transform>(), &data.world.read_storage::<ObjectType>()).join().filter(|t| *t.1 == ObjectType::Player).for_each(|t| info!("{:?}", t));
 
-        time_sync(&data.world);
-        data.data.update(&data.world);
+        time_sync(world);
         Trans::None
     }
 
     fn handle_event(
         &mut self,
-        _data: StateData<GameData>,
-        event: AllEvents,
-    ) -> CustomTrans<'a, 'b> {
+        _world: &mut World,
+        event: &AllEvents,
+    ) -> Trans<MyState> {
         // TODO: Map finished
         match event {
             AllEvents::Window(ev) => {
                 if is_key_down(&ev, VirtualKeyCode::Escape) {
-                    Trans::Push(Box::new(PauseMenuState::default()))
+                    Trans::Push(MyState::Pause)
                 } else {
                     Trans::None
                 }
             }
             AllEvents::Custom(CustomStateEvent::GotoMainMenu) => {
-                Trans::Switch(Box::new(MapSelectState::default()))
+                Trans::Switch(MyState::MapSelect)
             }
             AllEvents::Custom(CustomStateEvent::MapFinished) => {
-                Trans::Switch(Box::new(ResultState::default()))
+                Trans::Switch(MyState::Result)
             },
             AllEvents::Custom(CustomStateEvent::Retry) => {
-                Trans::Switch(Box::new(MapLoadState::default()))
+                Trans::Switch(MyState::MapLoad)
             }
             _ => Trans::None,
         }

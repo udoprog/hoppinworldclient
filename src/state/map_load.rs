@@ -20,7 +20,7 @@ use amethyst::core::*;
 use amethyst::renderer::*;
 use verts_from_mesh_data;
 use resource::CurrentMap;
-use hoppinworldruntime::{MyPhysicalEntityParts, ObjectType, AllEvents, RuntimeProgress, CustomTrans, RemovalId, RuntimeMapBuilder};
+use hoppinworldruntime::{MyPhysicalEntityParts, ObjectType, AllEvents, RuntimeProgress, RemovalId, RuntimeMapBuilder};
 use amethyst_extra::AssetLoader;
 use {add_removal_to_entity, Gravity};
 use amethyst::ui::UiCreator;
@@ -36,20 +36,20 @@ pub struct MapLoadState {
     init_done: bool,
 }
 
-impl<'a, 'b> State<GameData<'a, 'b>, AllEvents> for MapLoadState {
-    fn on_start(&mut self, mut data: StateData<GameData>) {
-        data.world.write_resource::<Time>().set_time_scale(0.0);
+impl dynamic::State<MyState, AllEvents> for MapLoadState {
+    fn on_start(&mut self, mut world: &mut World) {
+        world.write_resource::<Time>().set_time_scale(0.0);
 
         self.init_done = false;
 
         let pg = ProgressCounter::new();
 
-        let name = data.world.read_resource::<CurrentMap>().0.clone();
-        let display_name = data.world.read_resource::<CurrentMap>().1.name.clone();
+        let name = world.read_resource::<CurrentMap>().0.clone();
+        let display_name = world.read_resource::<CurrentMap>().1.name.clone();
 
-        set_discord_state(format!("Hoppin On: {}", display_name.clone()), &mut data.world);
+        set_discord_state(format!("Hoppin On: {}", display_name.clone()), world);
 
-        let scene_handle = data.world.read_resource::<AssetLoader>()
+        let scene_handle = world.read_resource::<AssetLoader>()
             .load(
                 //&format!("../../{}",gltf_path_from_map(&get_working_dir(), &name)),
                 &gltf_path_from_map("../..", &name),
@@ -58,9 +58,9 @@ impl<'a, 'b> State<GameData<'a, 'b>, AllEvents> for MapLoadState {
                     flip_v_coord: true,
                     ..Default::default()
                 },
-                &mut data.world.write_resource(),
-                &mut data.world.write_resource(),
-                &data.world.read_resource(),
+                &mut world.write_resource(),
+                &mut world.write_resource(),
+                &world.read_resource(),
         );
 
         /*let scene_handle = data.world.exec(|loader: PrefabLoader<GltfPrefab>| {
@@ -80,16 +80,16 @@ impl<'a, 'b> State<GameData<'a, 'b>, AllEvents> for MapLoadState {
             return;
         }
 
-        let player_settings = data.world.read_resource::<PlayerSettings>().clone();
+        let player_settings = world.read_resource::<PlayerSettings>().clone();
 
         self.load_progress = Some(pg);
 
-        data.world.create_entity()
+        world.create_entity()
             .with(scene_handle.unwrap())
             .with(Removal::new(RemovalId::Scene))
             .build();
 
-        data.world.add_resource(Gravity::new(Vector3::new(0.0, player_settings.gravity, 0.0)));
+        world.add_resource(Gravity::new(Vector3::new(0.0, player_settings.gravity, 0.0)));
 
         let mut jump = Jump::new(true, true, player_settings.jump_velocity, true);
         jump.jump_timing_boost = Some(
@@ -103,8 +103,7 @@ impl<'a, 'b> State<GameData<'a, 'b>, AllEvents> for MapLoadState {
             }).build()
         );
 
-        let player_entity = data
-            .world
+        let player_entity = world
             .create_entity()
             .with(player_settings.movement) 
             .with(player_settings.grounded)
@@ -140,7 +139,7 @@ impl<'a, 'b> State<GameData<'a, 'b>, AllEvents> for MapLoadState {
         
         // TODO add conf ability to this
         tr.translation = [0.0, 0.25, 0.0].into();
-        data.world
+        world
             .create_entity()
             .with(tr)
             .with(RotationControl::default())
@@ -151,7 +150,7 @@ impl<'a, 'b> State<GameData<'a, 'b>, AllEvents> for MapLoadState {
 
 
         // Secondary ground collider
-        data.world
+        world
             .create_entity()
             .with(ObjectType::PlayerFeet)
             .with_static_physical_entity(
@@ -195,7 +194,7 @@ impl<'a, 'b> State<GameData<'a, 'b>, AllEvents> for MapLoadState {
             })).with(Removal::new(RemovalId::Scene))
             .build();*/
 
-        data.world
+        world
             .create_entity()
             .with(tr)
             .with(Light::Directional(DirectionalLight {
@@ -204,26 +203,26 @@ impl<'a, 'b> State<GameData<'a, 'b>, AllEvents> for MapLoadState {
             })).with(Removal::new(RemovalId::Scene))
             .build();
 
-        let ui_root = data.world.exec(|mut creator: UiCreator| {
+        let ui_root = world.exec(|mut creator: UiCreator| {
             creator.create("assets/base/prefabs/gameplay_ui.ron", ())
         });
-        add_removal_to_entity(ui_root, RemovalId::GameplayUi, &data.world);
+        add_removal_to_entity(ui_root, RemovalId::GameplayUi, world);
 
-        data.world.add_resource(RuntimeProgress::default());
-        MyPhysicalEntityParts::setup(&mut data.world.res)
+        world.add_resource(RuntimeProgress::default());
+        MyPhysicalEntityParts::setup(&mut world.res)
     }
 
-    fn update(&mut self, data: StateData<GameData>) -> CustomTrans<'a, 'b> {
+    fn update(&mut self, world: &mut World) -> Trans<MyState> {
         if self.load_progress.is_none() {
-            return Trans::Switch(Box::new(MapSelectState::default()));
+            return Trans::Switch(MyState::MapSelect);
         }
         if !self.init_done && self.load_progress.as_ref().unwrap().is_complete() {
             info!("BBBBBBBBBBBBBBBBBBBBBBBBBBBBB");
             let entity_sizes = (
-                &*data.world.entities(),
-                &data.world.read_storage::<Transform>(),
-                &data.world.read_storage::<MeshData>(),
-                &data.world.read_storage::<Named>(),
+                &*world.entities(),
+                &world.read_storage::<Transform>(),
+                &world.read_storage::<MeshData>(),
+                &world.read_storage::<Named>(),
             )
                 .par_join()
                 .map(|(entity, transform, mesh_data, name)| {
@@ -240,7 +239,7 @@ impl<'a, 'b> State<GameData<'a, 'b>, AllEvents> for MapLoadState {
                 self.init_done = true;
 
                 let max_segment = {
-                	let (mut physical_parts, mut object_types, mut meshes, players, mut removals) = <(MyPhysicalEntityParts, WriteStorage<ObjectType>, WriteStorage<Handle<Mesh>>, ReadStorage<PlayerTag>, WriteStorage<Removal<RemovalId>>) as SystemData>::fetch(&data.world.res);
+                	let (mut physical_parts, mut object_types, mut meshes, players, mut removals) = <(MyPhysicalEntityParts, WriteStorage<ObjectType>, WriteStorage<Handle<Mesh>>, ReadStorage<PlayerTag>, WriteStorage<Removal<RemovalId>>) as SystemData>::fetch(&world.res);
                     for (entity, transform, mesh, name) in entity_sizes {
                         let (obj_type, coll_strat) = if name == "StartZone" {
                             // Move player to StartZone
@@ -314,16 +313,15 @@ impl<'a, 'b> State<GameData<'a, 'b>, AllEvents> for MapLoadState {
             	};
 
             	// Validate map
-            	runtime_map.build(&data.world.read_resource::<CurrentMap>().1).unwrap();
+            	runtime_map.build(&world.read_resource::<CurrentMap>().1).unwrap();
 
 
-                data.world.add_resource(RuntimeProgress::new(max_segment + 1));
+                world.add_resource(RuntimeProgress::new(max_segment + 1));
             }
         } else if self.init_done {
-            return Trans::Switch(Box::new(GameplayState::default()));
+            return Trans::Switch(MyState::Gameplay);
         }
 
-        data.data.update(&data.world);
         Trans::None
     }
 }

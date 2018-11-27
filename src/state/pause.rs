@@ -7,47 +7,45 @@ use amethyst::input::*;
 use amethyst::ui::*;
 use amethyst::shrev::EventChannel;
 use amethyst::renderer::VirtualKeyCode;
-use hoppinworldruntime::{AllEvents, CustomStateEvent, CustomTrans, RemovalId};
+use hoppinworldruntime::{AllEvents, CustomStateEvent, RemovalId};
 
 #[derive(Default)]
 pub struct PauseMenuState;
 
-impl<'a, 'b> State<GameData<'a, 'b>, AllEvents> for PauseMenuState {
-    fn on_start(&mut self, data: StateData<GameData>) {
-        let ui_root = data
-            .world
+impl dynamic::State<MyState, AllEvents> for PauseMenuState {
+    fn on_start(&mut self, world: &mut World) {
+        let ui_root = world
             .exec(|mut creator: UiCreator| creator.create("assets/base/prefabs/pause_ui.ron", ()));
-        add_removal_to_entity(ui_root, RemovalId::PauseUi, &data.world);
+        add_removal_to_entity(ui_root, RemovalId::PauseUi, world);
     }
 
-    fn update(&mut self, data: StateData<GameData>) -> CustomTrans<'a, 'b> {
+    fn update(&mut self, world: &mut World) -> Trans<MyState> {
         // Necessary otherwise rhusics will keep the same DeltaTime and will not be paused.
-        time_sync(&data.world);
-        data.data.update(&data.world);
+        time_sync(world);
         Trans::None
     }
 
     fn handle_event(
         &mut self,
-        data: StateData<GameData>,
-        event: AllEvents,
-    ) -> CustomTrans<'a, 'b> {
+        world: &mut World,
+        event: &AllEvents,
+    ) -> Trans<MyState> {
         match event {
             AllEvents::Ui(UiEvent {
                 event_type: UiEventType::Click,
                 target: entity,
             }) => {
-                if let Some(ui_transform) = data.world.read_storage::<UiTransform>().get(entity) {
+                if let Some(ui_transform) = world.read_storage::<UiTransform>().get(entity) {
                     match &*ui_transform.id {
                         "resume_button" => Trans::Pop,
                         "retry_button" => {
-                            data.world
+                            world
                                 .write_resource::<EventChannel<CustomStateEvent>>()
                                 .single_write(CustomStateEvent::Retry);
                             Trans::Pop
                         }
                         "quit_button" => {
-                            data.world
+                            world
                                 .write_resource::<EventChannel<CustomStateEvent>>()
                                 .single_write(CustomStateEvent::GotoMainMenu);
                             Trans::Pop
@@ -69,10 +67,10 @@ impl<'a, 'b> State<GameData<'a, 'b>, AllEvents> for PauseMenuState {
         }
     }
 
-    fn on_stop(&mut self, data: StateData<GameData>) {
+    fn on_stop(&mut self, world: &mut World) {
         exec_removal(
-            &data.world.entities(),
-            &data.world.read_storage(),
+            &world.entities(),
+            &world.read_storage(),
             RemovalId::PauseUi,
         );
     }

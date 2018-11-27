@@ -503,7 +503,7 @@ fn main() -> amethyst::Result<()> {
             ).with_pass(DrawUi::new()),
     );
 
-    let game_data = GameDataBuilder::default()
+    let builder = ApplicationBuilder::default(resources_directory, MyState::Init)
         .with(RelativeTimerSystem, "relative_timer", &[])
         .with(
             PrefabLoaderSystem::<ScenePrefab>::default(),
@@ -550,16 +550,24 @@ fn main() -> amethyst::Result<()> {
         )?
         .with_bundle(FPSCounterBundle)?
         //.with_bundle(editor_bundle)?
-        ;
-
-    let mut game_builder = CoreApplication::<_, AllEvents, AllEventsReader>::build(resources_directory, InitState::default())?
         .with_resource(asset_loader)
         .with_resource(AssetLoaderInternal::<FontAsset>::new())
-        .with_resource(AssetLoaderInternal::<Prefab<GltfPrefab>>::new());
+        .with_resource(AssetLoaderInternal::<Prefab<GltfPrefab>>::new())
+        // Note: this is where the states are instantiated.
+        .with_state(MyState::Init, InitState::default())
+        .with_state(MyState::Login, LoginState::default()),
+        .with_state(MyState::MainMenu, MainMenuState::default()),
+        .with_state(MyState::MapSelect, MapSelectState::default()),
+        .with_state(MyState::Gameplay, GameplayState::default()),
+        .with_state(MyState::PauseMenu, PauseMenuState::default()),
+        .with_state(MyState::MapLoad, MapLoadState::default()),
+        .with_state(MyState::Result, ResultState::default()),
+        ;
+
     if let Ok(discord) = init_discord_rich_presence() {
-        game_builder = game_builder.with_resource(discord);
+        builder = builder.with_resource(discord);
     }
-    let mut game = game_builder.build(game_data)?;
+    let mut game = builder.build()?;
     game.run();
     Ok(())
 }

@@ -16,3 +16,15 @@ pub use self::gameplay::GameplayState;
 pub use self::pause::PauseMenuState;
 pub use self::map_load::MapLoadState;
 pub use self::result::ResultState;
+
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
+pub enum MyState {
+    Init,
+    Login,
+    MainMenu,
+    MapSelect,
+    Gameplay,
+    PauseMenu,
+    MapLoad,
+    Result,
+}

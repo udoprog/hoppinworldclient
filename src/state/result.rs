@@ -1,5 +1,5 @@
 use resource::CurrentMap;
-use hoppinworldruntime::{AllEvents, RuntimeProgress, CustomTrans, RemovalId};
+use hoppinworldruntime::{AllEvents, RuntimeProgress, RemovalId};
 use amethyst_extra::AssetLoader;
 use {add_removal_to_entity, Auth, sec_to_display, submit_score, ScoreInsertRequest};
 use amethyst::ui::{UiCreator, UiTransform, UiText, UiEvent, Anchor, FontFormat, UiFinder, UiEventType};
@@ -15,15 +15,14 @@ pub struct ResultState {
     finished: bool,
 }
 
-impl<'a, 'b> State<GameData<'a, 'b>, AllEvents> for ResultState {
-    fn on_start(&mut self, data: StateData<GameData>) {
-        let ui_root = data
-            .world
+impl dynamic::State<MyState, AllEvents> for ResultState {
+    fn on_start(&mut self, world: &mut World) {
+        let ui_root = world
             .exec(|mut creator: UiCreator| creator.create("assets/base/prefabs/result_ui.ron", ()));
-        add_removal_to_entity(ui_root, RemovalId::ResultUi, &data.world);
+        add_removal_to_entity(ui_root, RemovalId::ResultUi, world);
 
         // Time table.
-        let runtime_progress = data.world.read_resource::<RuntimeProgress>().clone();
+        let runtime_progress = world.read_resource::<RuntimeProgress>().clone();
 
         info!("SEGMENT TIMES: ");
         for t in &runtime_progress.segment_times {
@@ -32,22 +31,21 @@ impl<'a, 'b> State<GameData<'a, 'b>, AllEvents> for ResultState {
         info!("");
         info!("RUN DONE!");
 
-        let font = data
-            .world
+        let font = world
             .read_resource::<AssetLoader>()
             .load(
                 "font/arial.ttf",
                 FontFormat::Ttf,
                 (),
-                &mut data.world.write_resource(),
-                &mut data.world.write_resource(),
-                &data.world.read_resource(),
+                &mut world.write_resource(),
+                &mut world.write_resource(),
+                &world.read_resource(),
             ).expect("Failed to load font");
 
         let mut accum = 0.0;
         for (segment, time) in runtime_progress.segment_times.iter().enumerate() {
             // Accum
-            data.world.create_entity()
+            world.create_entity()
                 .with(UiTransform::new(String::from(""), Anchor::TopMiddle, -200.0, -350.0 - 100.0 * segment as f32, 3.0, 200.0, 100.0, -1))
                 .with(UiText::new(font.clone(), sec_to_display(*time), [0.1,0.1,0.1,1.0], 35.0))
                 .with(Removal::new(RemovalId::ResultUi))
@@ -64,7 +62,7 @@ impl<'a, 'b> State<GameData<'a, 'b>, AllEvents> for ResultState {
             }
 
             // Segment
-            data.world.create_entity()
+            world.create_entity()
                 .with(UiTransform::new(String::from(""), Anchor::TopMiddle, 200.0, -350.0 - 100.0 * segment as f32, 3.0, 200.0, 100.0, -1))
                 .with(UiText::new(font.clone(), sec_to_display(diff), [0.1,0.1,0.1,1.0], 35.0))
                 .with(Removal::new(RemovalId::ResultUi))
@@ -72,7 +70,7 @@ impl<'a, 'b> State<GameData<'a, 'b>, AllEvents> for ResultState {
         }
 
         // Web submit score if logged in
-        if let Some(auth_token) = data.world.res.try_fetch::<Auth>().map(|a| a.token.clone()) {
+        if let Some(auth_token) = world.res.try_fetch::<Auth>().map(|a| a.token.clone()) {
             let times = runtime_progress.segment_times.iter().map(|f| *f as f32);
             let total_time = runtime_progress.segment_times.iter().map(|f| *f as f32).last().unwrap();
             let insert = ScoreInsertRequest {
@@ -85,18 +83,16 @@ impl<'a, 'b> State<GameData<'a, 'b>, AllEvents> for ResultState {
                 average_speed: 0.0,
             };
 
-            submit_score(&mut data.world.write_resource(), &data.world.read_resource(), auth_token, insert);
+            submit_score(&mut world.write_resource(), &world.read_resource(), auth_token, insert);
         }
     }
 
-    fn update(&mut self, data: StateData<GameData>) -> CustomTrans<'a, 'b> {
-        data.data.update(&data.world);
-
+    fn update(&mut self, world: &mut World) -> Trans<MyState> {
         if !self.finished {
             // Set the map name
-            if let Some(map_name_entity) = UiFinder::fetch(&data.world.res).find("map_name") {
-                let map_name = data.world.read_resource::<CurrentMap>().1.name.clone();
-                data.world.write_storage::<UiText>().get_mut(map_name_entity).unwrap().text = map_name;
+            if let Some(map_name_entity) = UiFinder::fetch(&world.res).find("map_name") {
+                let map_name = world.read_resource::<CurrentMap>().1.name.clone();
+                world.write_storage::<UiText>().get_mut(map_name_entity).unwrap().text = map_name;
                 self.finished = true;
             }
         }
@@ -106,17 +102,17 @@ impl<'a, 'b> State<GameData<'a, 'b>, AllEvents> for ResultState {
 
     fn handle_event(
         &mut self,
-        data: StateData<GameData>,
-        event: AllEvents,
-    ) -> CustomTrans<'a, 'b> {
+        world: &mut World,
+        event: &AllEvents,
+    ) -> Trans<MyState> {
         match event {
             AllEvents::Ui(UiEvent {
                 event_type: UiEventType::Click,
                 target: entity,
             }) => {
-                if let Some(ui_transform) = data.world.read_storage::<UiTransform>().get(entity) {
+                if let Some(ui_transform) = world.read_storage::<UiTransform>().get(entity) {
                     match &*ui_transform.id {
-                        "back_button" => Trans::Switch(Box::new(MapSelectState::default())),
+                        "back_button" => Trans::Switch(MyState::MapSelect),
                         _ => Trans::None,
                     }
                 } else {
@@ -125,7 +121,7 @@ impl<'a, 'b> State<GameData<'a, 'b>, AllEvents> for ResultState {
             }
             AllEvents::Window(ev) => {
                 if is_key_down(&ev, VirtualKeyCode::Escape) {
-                    Trans::Switch(Box::new(MapSelectState::default()))
+                    Trans::Switch(MyState::MapSelect)
                 } else {
                     Trans::None
                 }
@@ -134,10 +130,10 @@ impl<'a, 'b> State<GameData<'a, 'b>, AllEvents> for ResultState {
         }
     }
 
-    fn on_stop(&mut self, data: StateData<GameData>) {
+    fn on_stop(&mut self, world: &mut World) {
         exec_removal(
-            &data.world.entities(),
-            &data.world.read_storage(),
+            &world.entities(),
+            &world.read_storage(),
             RemovalId::ResultUi,
         );
     }

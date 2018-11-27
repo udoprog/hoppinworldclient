@@ -5,39 +5,33 @@ use amethyst::prelude::*;
 use amethyst::utils::removal::*;
 use amethyst::ui::*;
 use state::*;
-use hoppinworldruntime::{AllEvents, CustomTrans, RemovalId};
+use hoppinworldruntime::{AllEvents, RemovalId};
 
 #[derive(Default)]
 pub struct MainMenuState;
 
-impl<'a, 'b> State<GameData<'a, 'b>, AllEvents> for MainMenuState {
-    fn on_start(&mut self, mut data: StateData<GameData>) {
-        let ui_root = data
-            .world
+impl dynamic::State<MyState, AllEvents> for MainMenuState {
+    fn on_start(&mut self, world: &mut World) {
+        let ui_root = world
             .exec(|mut creator: UiCreator| creator.create("assets/base/prefabs/menu_ui.ron", ()));
-        add_removal_to_entity(ui_root, RemovalId::MenuUi, &data.world);
+        add_removal_to_entity(ui_root, RemovalId::MenuUi, world);
 
-        set_discord_state(String::from("Main Menu"), &mut data.world);
-    }
-
-    fn update(&mut self, data: StateData<GameData>) -> CustomTrans<'a, 'b> {
-        data.data.update(&data.world);
-        Trans::None
+        set_discord_state(String::from("Main Menu"), world);
     }
 
     fn handle_event(
         &mut self,
-        data: StateData<GameData>,
+        world: &mut World,
         event: AllEvents,
-    ) -> CustomTrans<'a, 'b> {
+    ) -> Trans<MyState> {
         match event {
             AllEvents::Ui(UiEvent {
                 event_type: UiEventType::Click,
                 target: entity,
             }) => {
-                if let Some(ui_transform) = data.world.read_storage::<UiTransform>().get(entity) {
+                if let Some(ui_transform) = world.read_storage::<UiTransform>().get(entity) {
                     match &*ui_transform.id {
-                        "play_button" => Trans::Switch(Box::new(MapSelectState::default())),
+                        "play_button" => Trans::Switch(MyState::MapSelect),
                         "quit_button" => Trans::Quit,
                         _ => Trans::None,
                     }
@@ -49,10 +43,10 @@ impl<'a, 'b> State<GameData<'a, 'b>, AllEvents> for MainMenuState {
         }
     }
 
-    fn on_stop(&mut self, data: StateData<GameData>) {
+    fn on_stop(&mut self, world: &mut World) {
         exec_removal(
-            &data.world.entities(),
-            &data.world.read_storage(),
+            &world.entities(),
+            &world.read_storage(),
             RemovalId::MenuUi,
         );
     }

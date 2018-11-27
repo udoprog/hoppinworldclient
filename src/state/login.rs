@@ -7,13 +7,13 @@ use amethyst::utils::removal::*;
 use amethyst::ui::*;
 use amethyst::ecs::SystemData;
 use state::*;
-use hoppinworldruntime::{AllEvents, CustomTrans, RemovalId};
+use hoppinworldruntime::{AllEvents, RemovalId};
 
 #[derive(Default)]
 pub struct LoginState;
 
-impl<'a, 'b> State<GameData<'a, 'b>, AllEvents> for LoginState {
-    fn on_start(&mut self, mut data: StateData<GameData>) {
+impl dynamic::State<MyState, AllEvents> for LoginState {
+    fn on_start(&mut self, world: &mut World) {
         let ui_root = data
             .world
             .exec(|mut creator: UiCreator| creator.create("assets/base/prefabs/login_ui.ron", ()));
@@ -22,9 +22,7 @@ impl<'a, 'b> State<GameData<'a, 'b>, AllEvents> for LoginState {
         set_discord_state(String::from("Login"), &mut data.world);
     }
 
-    fn update(&mut self, mut data: StateData<GameData>) -> CustomTrans<'a, 'b> {
-        data.data.update(&data.world);
-
+    fn update(&mut self, mut data: StateData<GameData>) -> Trans<MyState> {
         loop {
             let myfn = {
                 let mut res = data.world.write_resource::<FutureProcessor>();
@@ -40,7 +38,7 @@ impl<'a, 'b> State<GameData<'a, 'b>, AllEvents> for LoginState {
         }
 
         if let Some(_) = data.world.res.try_fetch::<Auth>() {
-            return Trans::Switch(Box::new(MainMenuState::default()));
+            return Trans::Switch(MyState::MainMenu);
         }
 
         /*while let Some(f) = data.world.write_resource::<FutureProcessor>().queue.lock().unwrap().pop_front() {
@@ -53,7 +51,7 @@ impl<'a, 'b> State<GameData<'a, 'b>, AllEvents> for LoginState {
         &mut self,
         data: StateData<GameData>,
         event: AllEvents,
-    ) -> CustomTrans<'a, 'b> {
+    ) -> Trans<MyState> {
         match event {
             AllEvents::Ui(UiEvent {
                 event_type: UiEventType::Click,
@@ -69,7 +67,7 @@ impl<'a, 'b> State<GameData<'a, 'b>, AllEvents> for LoginState {
                             do_login(&mut data.world.write_resource::<Runtime>(), &data.world.read_resource(), username, password);
                             Trans::None
                         },
-                        "guest_button" => Trans::Switch(Box::new(MainMenuState::default())),
+                        "guest_button" => Trans::Switch(MyState::MainMenu),
                         "quit_button" => Trans::Quit,
                         _ => Trans::None,
                     }
@@ -81,10 +79,10 @@ impl<'a, 'b> State<GameData<'a, 'b>, AllEvents> for LoginState {
         }
     }
 
-    fn on_stop(&mut self, data: StateData<GameData>) {
+    fn on_stop(&mut self, world: &mut World) {
         exec_removal(
-            &data.world.entities(),
-            &data.world.read_storage(),
+            &world.entities(),
+            &world.read_storage(),
             RemovalId::LoginUi,
         );
     }

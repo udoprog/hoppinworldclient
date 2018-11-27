@@ -8,30 +8,29 @@ use amethyst::input::*;
 use amethyst::ui::*;
 use state::*;
 use amethyst::renderer::VirtualKeyCode;
-use hoppinworldruntime::{AllEvents, CustomTrans, RemovalId};
+use hoppinworldruntime::{AllEvents, RemovalId};
 
 #[derive(Default)]
 pub struct MapSelectState;
 
-impl<'a, 'b> State<GameData<'a, 'b>, AllEvents> for MapSelectState {
-    fn on_start(&mut self, mut data: StateData<GameData>) {
-        let ui_root = data.world.exec(|mut creator: UiCreator| {
+impl dynamic::State<MyState, AllEvents> for MapSelectState {
+    fn on_start(&mut self, mut world: &mut World) {
+        let ui_root = world.exec(|mut creator: UiCreator| {
             creator.create("assets/base/prefabs/map_select_ui.ron", ())
         });
-        add_removal_to_entity(ui_root, RemovalId::MapSelectUi, &data.world);
+        add_removal_to_entity(ui_root, RemovalId::MapSelectUi, world);
 
-        let font = data
-            .world
+        let font = world
             .read_resource::<AssetLoader>()
             .load(
                 "font/arial.ttf",
                 FontFormat::Ttf,
                 (),
-                &mut data.world.write_resource(),
-                &mut data.world.write_resource(),
-                &data.world.read_resource(),
+                &mut world.write_resource(),
+                &mut world.write_resource(),
+                &world.read_resource(),
             ).expect("Failed to load font");
-        let maps = data.world.read_resource::<MapInfoCache>().maps.clone();
+        let maps = world.read_resource::<MapInfoCache>().maps.clone();
         for (accum, (internal, info)) in maps.into_iter().enumerate() {
             info!("adding map!");
             let entity =
@@ -43,39 +42,34 @@ impl<'a, 'b> State<GameData<'a, 'b>, AllEvents> for MapSelectState {
                     .with_layer(8.0)
                     .with_position(0.0, -300.0 - 100.0 * accum as f32)
                     .with_anchor(Anchor::TopMiddle)
-                    .build_from_world(data.world);
-            add_removal_to_entity(entity, RemovalId::MapSelectUi, &data.world);
+                    .build_from_world(world);
+            add_removal_to_entity(entity, RemovalId::MapSelectUi, world);
         }
 
-        set_discord_state(String::from("Main Menu"), &mut data.world);
-    }
-
-    fn update(&mut self, data: StateData<GameData>) -> CustomTrans<'a, 'b> {
-        data.data.update(&data.world);
-        Trans::None
+        set_discord_state(String::from("Main Menu"), world);
     }
 
     fn handle_event(
         &mut self,
-        data: StateData<GameData>,
-        event: AllEvents,
-    ) -> CustomTrans<'a, 'b> {
+        world: &mut World,
+        event: &AllEvents,
+    ) -> Trans<MyState> {
         let mut change_map = None;
         match event {
             AllEvents::Ui(UiEvent {
                 event_type: UiEventType::Click,
                 target: entity,
             }) => {
-                if let Some(ui_transform) = data.world.read_storage::<UiTransform>().get(entity) {
+                if let Some(ui_transform) = world.read_storage::<UiTransform>().get(entity) {
                     match &*ui_transform.id {
                         "back_button" => {
-                            return Trans::Switch(Box::new(MainMenuState::default()));
+                            return Trans::Switch(MyState::MainMenu);
                         }
                         id => {
                             if id.starts_with("map_select_") {
                                 let map_name = &id[11..];
                                 change_map = Some(
-                                    data.world
+                                    world
                                         .read_resource::<MapInfoCache>()
                                         .maps
                                         .iter()
@@ -90,23 +84,23 @@ impl<'a, 'b> State<GameData<'a, 'b>, AllEvents> for MapSelectState {
             }
             AllEvents::Window(ev) => {
                 if is_key_down(&ev, VirtualKeyCode::Escape) {
-                    return Trans::Switch(Box::new(MainMenuState::default()));
+                    return Trans::Switch(MyState::MainMenu);
                 }
             }
             _ => {}
         }
 
         if let Some(row) = change_map {
-            data.world.add_resource(CurrentMap::new(row.0, row.1));
-            return Trans::Switch(Box::new(MapLoadState::default()));
+            world.add_resource(CurrentMap::new(row.0, row.1));
+            return Trans::Switch(MyState::MapLoad);
         }
         Trans::None
     }
 
-    fn on_stop(&mut self, data: StateData<GameData>) {
+    fn on_stop(&mut self, world: &mut World) {
         exec_removal(
-            &data.world.entities(),
-            &data.world.read_storage(),
+            &world.entities(),
+            &world.read_storage(),
             RemovalId::MapSelectUi,
         );
     }
